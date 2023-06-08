@@ -17,34 +17,53 @@ app.get("/", (req, res) => {
 });
 
 app.post("/login", (req, res) => {
-  res.send("login");
-});
-app.post("/register", (req, res) => {
-  res.send("register");
-
-  const { name, email, password } = req.body;
-  User.findOne({ email: email }, (err, user) => {
+  const { email, password } = req.body;
+  User.findOne({ email: email }).then((user) => {
+    console.log(user);
     if (user) {
-      res.send({ message: "user already registered" });
-
-      console.log("already");
+      if (password === user.password) {
+        res.send({ message: "login successfully", user });
+      } else {
+        res.send({ message: "password dodnt match" });
+      }
     } else {
-      const user = new User({
-        name,
-        email,
-        password,
-      });
-      user.save().then(
-        (res) => {
-          console.log("response is", res);
-        },
-        (err) => {
-          console.log(err);
-        }
-      );
+      res.send({ message: "User not registerd yet" });
     }
   });
-
+});
+app.post("/register", (req, res) => {
+  const { name, email, password } = req.body;
+  const useremail = User.findOne({ email: email });
+  // console.log("email is", useremail);
+  User.findOne({ email: email })
+    .then((user) => {
+      console.log("user is", user);
+      if (user) {
+        return res.status(400).send({
+          error: "User Exist",
+        });
+      } else {
+        const user = new User({
+          name,
+          email,
+          password,
+        });
+        user.save().then(
+          (data) => {
+            return res.status(200).send({
+              data,
+              Message: "User is created",
+            });
+          },
+          (err) => {
+            console.log(err);
+          }
+        );
+      }
+    })
+    .catch((error) => {
+      console.log("error", error);
+    });
   //   user.save((err) => {
   //     if (err) {
   //       res.send(err);
