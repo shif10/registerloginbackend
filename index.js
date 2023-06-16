@@ -1,15 +1,17 @@
-import express, { urlencoded } from "express";
-import cors from "cors";
-import mongoose from "mongoose";
-import jwt from "jsonwebtoken";
-import bcryptjs from "bcryptjs";
-import cookieParser from "cookie-parser";
+const express = require("express");
+const cors = require("cors");
+const mongoose = require("mongoose");
+const jwt = require("jsonwebtoken");
+const bcryptjs = require("bcryptjs");
+const cookieparser = require("cookie-parser");
+
+const auth = require("./middleware/auth");
 const app = express();
+app.use(cookieparser());
 app.use(express.json());
 app.use(express.urlencoded());
 app.use(cors());
 
-app.use(cookieParser());
 const con = mongoose.connect(`mongodb://0.0.0.0:27017/myloginregdb`, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
@@ -27,6 +29,7 @@ app.post("/login", async (req, res) => {
       const correctpass = await bcryptjs.compare(password, user.password);
       console.log("pass", correctpass);
       console.log(user);
+
       if (user && correctpass) {
         console.log(user, password);
         const token = jwt.sign(
@@ -35,23 +38,16 @@ app.post("/login", async (req, res) => {
           },
           "shhhh",
           {
-            expiresIn: "6h",
+            expiresIn: "1h",
           }
         );
         (user.token = token), (user.password = undefined);
-        // res.status(201).json({ user: user });
 
-        const options = {
-          expires: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
-          httpOnly: true,
-        };
-        res.status(200).cookie("token", token, options).json({
-          success: true,
-          token,
+        res.status(200).send({
           user: user,
         });
       } else {
-        res.status(404).send({ message: "User not registerd yet" });
+        res.status(404).send({ message: "Username or Password is  Incorrect" });
       }
     }
   } catch (err) {
@@ -84,14 +80,6 @@ app.post("/register", async (req, res) => {
             password: encryptpass,
           });
 
-          const token = jwt.sign(
-            {
-              id: user._id,
-              email: email,
-            },
-            "shhhh",
-            { expiresIn: "6h" }
-          );
           user.token = token;
           user.password = undefined;
 
@@ -131,6 +119,9 @@ if (con) {
   console.log("started connected", con);
 }
 
+app.get("/home", auth, async (req, res) => {
+  // const user = await User.find();
+});
 const UserSchema = mongoose.Schema({
   name: String,
   email: String,
