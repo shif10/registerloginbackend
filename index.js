@@ -4,7 +4,8 @@ const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
 const bcryptjs = require("bcryptjs");
 const cookieparser = require("cookie-parser");
-
+const nodemailer = require("nodemailer");
+var bodyParser = require("body-parser");
 const auth = require("./middleware/auth");
 const app = express();
 app.use(cookieparser());
@@ -21,6 +22,74 @@ app.get("/", (req, res) => {
   console.log("be started Api");
 });
 
+const sendvarificationmail = async (name, email, user_id) => {
+  try {
+    const transporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 587,
+      secure: false,
+      requireTLS: true,
+      auth: {
+        user: "shifab@lanatussystems.com",
+        pass: "fdvaqrlpebkewsvk",
+      },
+    });
+    console.log("in mail user v id", user_id);
+    const mailoptions = {
+      from: "shifab@lanatussystems.com",
+      to: email,
+      subject: "form mail varification",
+      html:
+        "<p>hii" +
+        name +
+        '  Please varify your mail click here  <a href="http://localhost:9003/verify?id=' +
+        user_id +
+        '">verify</a> your mail.</p> ',
+    };
+
+    transporter.sendMail(mailoptions, function (error, info) {
+      if (error) {
+        console.log(error);
+      } else {
+        console.log("mail has benn sent", info.response);
+      }
+    });
+  } catch (error) {
+    console.log("erorr for mail is", error);
+  }
+};
+var user = null;
+const verifymail = async (req, res) => {
+  try {
+    const userId = req.query.id;
+    var user = User.findOne({ _id: userId });
+    const updateInfo = await User.updateOne(
+      { _id: userId },
+      { $set: { is_varified: 1 } }
+    );
+    if (user.is_varified) console.log(req.query.id);
+    // localStorage.setItem("userdata", JSON.stringify(user));
+    res.send({ message: "email varified successfully", user: user });
+    console.log(updateInfo);
+  } catch (error) {
+    console.log("error", error);
+  } finally {
+  }
+};
+
+app.get("/resendmail", async (req, res) => {
+  try {
+    const { name, email, id } = req.body;
+    console.log("name", name, email, id);
+    // sendvarificationmail(name, email, id);
+  } catch (error) {
+    console.log("resend backend error is ,", error);
+  }
+});
+app.get("/verify", verifymail);
+app.get("/varifymail", (req, res) => {
+  res.send({ user: "hello" });
+});
 app.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -61,26 +130,30 @@ app.post("/register", async (req, res) => {
     const encryptpass = await bcryptjs.hash(password, 10);
     // console.log("email is", useremail);
     User.findOne({ email: email })
-      .then((user) => {
+      .then(async (user) => {
         console.log("user is", user);
         if (user) {
           return res.status(400).send({
             error: "User Exist",
           });
         } else {
-          // const user = new User({
-          //   name,
-          //   email,
-          //   password,
-          // });
-
-          const user = User.create({
+          const user = new User({
             name,
             email,
-            password: encryptpass,
+            password,
+            is_varified: 0,
           });
 
-          user.token = token;
+          // const user = User.create({
+          //   name,
+          //   email,
+          //   password: encryptpass,
+          // });
+          const userdata = await user.save();
+
+          console.log("id is", user);
+          const mail = sendvarificationmail(name, email, user._id);
+          // user.token = token;
           user.password = undefined;
 
           res.status(200).json({ user: user });
@@ -127,9 +200,13 @@ const UserSchema = mongoose.Schema({
   email: String,
   password: String,
   token: String,
+  is_varified: {
+    type: Number,
+    default: 0,
+  },
 });
 const User = mongoose.model("User", UserSchema);
-
+app.use(bodyParser.json());
 app.listen(9003, () => {
   console.log("started 9003");
 });
